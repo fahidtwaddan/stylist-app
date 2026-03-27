@@ -205,13 +205,19 @@ async function fashnTryOn(
 ): Promise<string | null> {
   if (!fashn) return null;
 
-  const result = await fashn.predictions.subscribe({
+  try {
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => {
+      console.log(`[FASHN][${category}] Timed out after 60s`);
+      resolve(null);
+    }, 60000));
+
+    const fashnPromise = fashn.predictions.subscribe({
     model_name: "tryon-v1.6",
     inputs: {
       model_image: modelImage,
       garment_image: garmentUrl,
       category,
-      mode: "quality",
+      mode: "balanced",
       garment_photo_type: "auto",
       num_samples: 1,
       output_format: "png",
@@ -219,16 +225,13 @@ async function fashnTryOn(
     onQueueUpdate: (status) => {
       console.log(`[FASHN][${category}] ${status.status}`);
     },
-  });
+  }).then(r => r.status === "completed" && r.output?.[0] ? r.output[0] : null);
 
-  if (result.status === "completed" && result.output?.[0]) {
-    return result.output[0];
+    return await Promise.race([fashnPromise, timeoutPromise]);
+  } catch (e) {
+    console.error(`[FASHN][${category}] Error:`, e);
+    return null;
   }
-
-  if (result.error) {
-    console.error(`[FASHN][${category}] Error:`, result.error.name, result.error.message);
-  }
-  return null;
 }
 
 // ─── Download image URL → data URI ───────────────────────────────────

@@ -48,20 +48,11 @@ export default function AutoTryOnPage() {
 
   const [result, setResult] = useState<TryOnResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingStep, setLoadingStep] = useState(0);
+  const [liveStep, setLiveStep] = useState("Starting...");
   const [showGenerated, setShowGenerated] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const occasion = OCCASIONS.find((o) => o.id === selectedOccasion);
-
-  // Loading step animation
-  useEffect(() => {
-    if (!isLoading) { setLoadingStep(0); return; }
-    const timers = [0, 1, 2, 3, 4, 5].map((step, i) =>
-      setTimeout(() => setLoadingStep(step), i * 8000)
-    );
-    return () => timers.forEach(clearTimeout);
-  }, [isLoading]);
 
   const runFullPipeline = useCallback(async () => {
     if (!photo || !profile || !selectedOccasion) return;
@@ -79,9 +70,11 @@ export default function AutoTryOnPage() {
 
     setIsLoading(true);
     setError(null);
+    setLiveStep("Starting...");
 
     try {
-      const response = await fetch("/api/ai-stylist", {
+      // Step 1: Start the job
+      const startRes = await fetch("/api/ai-stylist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -92,10 +85,29 @@ export default function AutoTryOnPage() {
         }),
       });
 
-      if (!response.ok) throw new Error("Styling failed");
-      const data = await response.json();
-      setResult(data);
-      if (data.tryOnImage) setShowGenerated(true);
+      if (!startRes.ok) throw new Error("Failed to start styling");
+      const { jobId } = await startRes.json();
+
+      // Step 2: Poll for completion
+      while (true) {
+        await new Promise((r) => setTimeout(r, 2000)); // Poll every 2s
+
+        const pollRes = await fetch(`/api/ai-stylist?jobId=${jobId}`);
+        if (!pollRes.ok) throw new Error("Polling failed");
+        const data = await pollRes.json();
+
+        setLiveStep(data.step || "Processing...");
+
+        if (data.status === "completed") {
+          setResult(data);
+          if (data.tryOnImage) setShowGenerated(true);
+          break;
+        }
+
+        if (data.status === "failed") {
+          throw new Error(data.error || "Styling failed");
+        }
+      }
     } catch (err) {
       console.error("Pipeline error:", err);
       setError("Something went wrong. Tap to retry.");
@@ -124,14 +136,7 @@ export default function AutoTryOnPage() {
 
   if (!photo || !profile) return null;
 
-  const STEPS = [
-    `Designing the perfect ${occasion?.name || "look"} outfit...`,
-    "Searching Namshi for real products...",
-    "AI Vision selecting the best fit for you...",
-    "Dressing you in the top...",
-    "Applying the bottoms...",
-    "Final styling & analysis...",
-  ];
+  // Live step comes from the server via polling
 
   return (
     <div className="min-h-screen px-5 py-8">
@@ -161,18 +166,14 @@ export default function AutoTryOnPage() {
             </div>
           </div>
 
-          <div className="glass rounded-2xl p-5 space-y-3">
-            {STEPS.map((step, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className={`h-2 w-2 rounded-full transition-colors duration-500 ${loadingStep >= i ? "bg-gold-400" : "bg-white/10"}`} />
-                <p className={`text-xs transition-colors duration-500 ${loadingStep >= i ? "text-white/70" : "text-white/20"}`}>{step}</p>
-                {loadingStep === i && (
-                  <div className="h-1 flex-1 rounded bg-white/5 overflow-hidden">
-                    <div className="h-full bg-gold-400/40 rounded shimmer" />
-                  </div>
-                )}
-              </div>
-            ))}
+          <div className="glass rounded-2xl p-5">
+            <div className="flex items-center gap-3">
+              <div className="h-3 w-3 rounded-full bg-gold-400 animate-pulse" />
+              <p className="text-sm text-gold-300 font-mono">{liveStep}</p>
+            </div>
+            <div className="mt-3 h-1 w-full rounded bg-white/5 overflow-hidden">
+              <div className="h-full bg-gold-400/40 rounded shimmer" />
+            </div>
           </div>
         </motion.div>
       )}
