@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import ShareCard from "@/components/ShareCard";
@@ -10,9 +10,12 @@ export default function SharePage() {
   const router = useRouter();
   const { referral, setReferral, profile } = useStyleStore();
   const [copied, setCopied] = useState(false);
+  const hasRun = useRef(false);
 
   const generateReferral = useCallback(async () => {
+    if (hasRun.current) return;
     if (referral) return;
+    hasRun.current = true;
 
     try {
       const response = await fetch("/api/referral", {

@@ -1,6 +1,16 @@
 "use client";
 
 import { motion } from "framer-motion";
+import {
+  Crown,
+  Quote,
+  User,
+  Sun,
+  Palette,
+  ShieldX,
+  Sparkles,
+  Lightbulb,
+} from "lucide-react";
 import type { StyleProfile } from "@/lib/types";
 
 interface StyleCardProps {
@@ -9,20 +19,21 @@ interface StyleCardProps {
 
 export default function StyleCard({ profile }: StyleCardProps) {
   return (
-    <div className="space-y-6">
-      {/* Archetype Badge */}
+    <div className="space-y-4">
+      {/* Archetype */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="text-center"
       >
-        <p className="text-sm uppercase tracking-widest text-gold-400/70">
+        <Crown className="mx-auto h-5 w-5 text-gold-400/70" />
+        <p className="text-[10px] uppercase tracking-widest text-gold-400/70 mt-1">
           Your Style Archetype
         </p>
-        <h2 className="mt-2 text-3xl font-bold text-gradient">
+        <h2 className="mt-1 text-2xl font-bold text-gradient">
           {profile.archetype}
         </h2>
-        <p className="mt-2 text-sm text-white/60">{profile.personality}</p>
+        <p className="mt-1 text-xs text-white/60">{profile.personality}</p>
       </motion.div>
 
       {/* Narrative */}
@@ -30,86 +41,84 @@ export default function StyleCard({ profile }: StyleCardProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="glass rounded-2xl p-5"
+        className="glass rounded-2xl p-4"
       >
-        <p className="text-sm italic leading-relaxed text-white/70">
+        <Quote className="h-4 w-4 text-gold-400/50 mb-1.5" />
+        <p className="text-xs italic leading-relaxed text-white/70">
           &ldquo;{profile.narrative}&rdquo;
         </p>
       </motion.div>
 
-      {/* Stats Grid */}
+      {/* Stats — 3 cols */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="grid grid-cols-2 gap-3"
+        className="grid grid-cols-3 gap-2"
       >
-        <div className="glass rounded-2xl p-4">
-          <p className="text-xs uppercase tracking-wider text-white/40">
-            Body Type
-          </p>
-          <p className="mt-1 text-sm font-semibold text-white">
-            {profile.bodyType}
-          </p>
-        </div>
-        <div className="glass rounded-2xl p-4">
-          <p className="text-xs uppercase tracking-wider text-white/40">
-            Skin Tone
-          </p>
-          <p className="mt-1 text-sm font-semibold text-white">
-            {profile.skinTone}
-          </p>
-        </div>
-        <div className="glass rounded-2xl p-4 col-span-2">
-          <p className="text-xs uppercase tracking-wider text-white/40">
-            Color Season
-          </p>
-          <p className="mt-1 text-sm font-semibold text-white">
-            {profile.colorSeason}
-          </p>
-        </div>
+        {[
+          { icon: User, label: "Body", value: profile.bodyType },
+          { icon: Sun, label: "Skin", value: profile.skinTone },
+          { icon: Sparkles, label: "Season", value: profile.colorSeason },
+        ].map(({ icon: Icon, label, value }) => (
+          <div key={label} className="glass rounded-xl p-3 text-center">
+            <Icon className="h-3.5 w-3.5 text-gold-400/60 mx-auto mb-1" />
+            <p className="text-[9px] uppercase tracking-wider text-white/40">
+              {label}
+            </p>
+            <p className="text-[11px] font-semibold text-white mt-0.5 leading-tight">
+              {value}
+            </p>
+          </div>
+        ))}
       </motion.div>
 
-      {/* Color Palette */}
+      {/* Colors */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="space-y-3"
+        className="glass rounded-2xl p-4 space-y-3"
       >
-        <p className="text-xs uppercase tracking-widest text-white/40">
-          Your Color Palette
-        </p>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-1.5">
+          <Palette className="h-3.5 w-3.5 text-gold-400/60" />
+          <p className="text-[10px] uppercase tracking-widest text-white/40">
+            Your Colors
+          </p>
+        </div>
+        <div className="flex gap-1.5">
           {profile.colorPalette.map((color, i) => (
             <motion.div
               key={color}
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              transition={{ delay: 0.4 + i * 0.05 }}
-              className="flex-1 aspect-square rounded-xl shadow-lg"
+              transition={{ delay: 0.4 + i * 0.04 }}
+              className="flex-1 aspect-square rounded-lg shadow-lg"
               style={{ backgroundColor: color }}
               title={color}
             />
           ))}
         </div>
 
-        <p className="text-xs uppercase tracking-widest text-white/40 mt-4">
-          Colors to Avoid
-        </p>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-1.5 pt-1">
+          <ShieldX className="h-3.5 w-3.5 text-red-400/60" />
+          <p className="text-[10px] uppercase tracking-widest text-white/40">
+            Avoid
+          </p>
+        </div>
+        <div className="flex gap-1.5">
           {profile.avoidColors.map((color, i) => (
             <motion.div
               key={color}
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              transition={{ delay: 0.5 + i * 0.05 }}
-              className="h-8 w-8 rounded-lg relative"
+              transition={{ delay: 0.5 + i * 0.04 }}
+              className="h-7 w-7 rounded-lg relative"
               style={{ backgroundColor: color }}
               title={color}
             >
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="h-[2px] w-6 bg-white/80 rotate-45 rounded" />
+                <div className="h-[2px] w-5 bg-white/80 rotate-45 rounded" />
               </div>
             </motion.div>
           ))}
@@ -121,25 +130,24 @@ export default function StyleCard({ profile }: StyleCardProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
-        className="space-y-3"
+        className="glass rounded-2xl p-4"
       >
-        <p className="text-xs uppercase tracking-widest text-white/40">
-          Style Recommendations
-        </p>
-        <div className="space-y-2">
+        <div className="flex items-center gap-1.5 mb-2.5">
+          <Lightbulb className="h-3.5 w-3.5 text-gold-400/60" />
+          <p className="text-[10px] uppercase tracking-widest text-white/40">
+            Recommendations
+          </p>
+        </div>
+        <div className="space-y-1.5">
           {profile.recommendations.map((rec, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5 + i * 0.1 }}
-              className="glass rounded-xl p-3 flex items-start gap-3"
-            >
-              <span className="text-gold-400 text-sm mt-0.5">
-                {String(i + 1).padStart(2, "0")}
+            <div key={i} className="flex items-start gap-2">
+              <span className="text-gold-400/50 text-[10px] mt-0.5">
+                &#9670;
               </span>
-              <p className="text-sm text-white/70">{rec}</p>
-            </motion.div>
+              <p className="text-[11px] text-white/60 flex-1 leading-snug">
+                {rec}
+              </p>
+            </div>
           ))}
         </div>
       </motion.div>

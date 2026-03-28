@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import TryOnView from "@/components/TryOnView";
@@ -37,6 +37,7 @@ export default function TryOnPage() {
     top: MatchedProduct | null;
     bottom: MatchedProduct | null;
   }>({ top: null, bottom: null });
+  const hasRun = useRef(false);
 
   // Animate through loading steps
   useEffect(() => {
@@ -51,8 +52,10 @@ export default function TryOnPage() {
   }, [isTryOnLoading]);
 
   const runTryOn = useCallback(async () => {
+    if (hasRun.current) return;
     if (!selectedOutfit || !photo) return;
     if (tryOnAnalysis) return;
+    hasRun.current = true;
 
     let b64 = photoBase64;
     let mType = photoMediaType;
@@ -309,60 +312,76 @@ export default function TryOnPage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="space-y-4"
+              className="space-y-3"
             >
+              {/* Verdict */}
               <div className="rounded-2xl bg-gradient-to-br from-gold-400/20 to-gold-600/10 border border-gold-400/30 p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs uppercase tracking-widest text-gold-400/70">AI Verdict</p>
-                  <span className="text-2xl font-bold text-gold-400">
-                    {tryOnAnalysis.confidenceScore}/100
-                  </span>
+                <div className="flex items-center gap-3">
+                  <div className="h-14 w-14 rounded-full bg-gold-400/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-xl font-bold text-gold-400">{tryOnAnalysis.confidenceScore}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <svg className="h-4 w-4 text-gold-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-xs uppercase tracking-widest text-gold-400/70">AI Verdict</p>
+                    </div>
+                    <p className="text-base text-white font-semibold leading-snug">{tryOnAnalysis.verdict}</p>
+                  </div>
                 </div>
-                <p className="text-white font-semibold text-lg leading-snug">
-                  {tryOnAnalysis.verdict}
-                </p>
               </div>
 
-              <div className="glass rounded-2xl p-5 space-y-4">
-                <p className="text-xs uppercase tracking-widest text-gold-400/70">
-                  How It Looks On You
-                </p>
-                <p className="text-sm text-white/80 leading-relaxed">
-                  {tryOnAnalysis.overallLook}
-                </p>
+              {/* Overall + Fit + Colors */}
+              <div className="glass rounded-2xl p-5 space-y-3">
+                <div className="flex items-start gap-2">
+                  <svg className="h-4 w-4 text-gold-400/60 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  <p className="text-sm text-white/70 leading-relaxed">{tryOnAnalysis.overallLook}</p>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="glass rounded-xl p-3">
-                    <p className="text-[10px] uppercase tracking-wider text-white/40 mb-1">Fit</p>
-                    <p className="text-xs text-white/70 leading-relaxed">{tryOnAnalysis.fitAnalysis}</p>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <svg className="h-3.5 w-3.5 text-gold-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <p className="text-xs uppercase tracking-wider text-white/40">Fit</p>
+                    </div>
+                    <p className="text-sm text-white/70 leading-snug">{tryOnAnalysis.fitAnalysis}</p>
                   </div>
                   <div className="glass rounded-xl p-3">
-                    <p className="text-[10px] uppercase tracking-wider text-white/40 mb-1">Colors</p>
-                    <p className="text-xs text-white/70 leading-relaxed">{tryOnAnalysis.colorHarmony}</p>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <svg className="h-3.5 w-3.5 text-gold-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                      </svg>
+                      <p className="text-xs uppercase tracking-wider text-white/40">Colors</p>
+                    </div>
+                    <p className="text-sm text-white/70 leading-snug">{tryOnAnalysis.colorHarmony}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="glass rounded-2xl p-5">
-                <p className="text-xs uppercase tracking-widest text-gold-400/70 mb-3">
-                  Styling Tips For You
-                </p>
-                <div className="space-y-2">
-                  {tryOnAnalysis.stylingTips.map((tip: string, i: number) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.1 * i }}
-                      className="flex items-start gap-3"
-                    >
-                      <span className="text-gold-400 text-xs mt-0.5 font-mono">
-                        {String(i + 1).padStart(2, "0")}
-                      </span>
-                      <p className="text-sm text-white/70 flex-1">{tip}</p>
-                    </motion.div>
-                  ))}
+              {/* Tips */}
+              {tryOnAnalysis.stylingTips.length > 0 && (
+                <div className="glass rounded-xl p-4">
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <svg className="h-4 w-4 text-gold-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    <p className="text-xs uppercase tracking-widest text-gold-400/70">Tips</p>
+                  </div>
+                  <div className="space-y-2">
+                    {tryOnAnalysis.stylingTips.map((tip: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="text-gold-400/50 text-xs mt-0.5">&#9670;</span>
+                        <p className="text-sm text-white/60 flex-1 leading-snug">{tip}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </motion.div>
           )}
 

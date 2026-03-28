@@ -41,6 +41,16 @@ interface StyleState {
   setTryOnImage: (url: string | null) => void;
   setTryOnLoading: (loading: boolean) => void;
 
+  // Auto Try-On (persists across navigation)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  autoTryOnResult: any | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  autoTryOnSearchResults: any | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  setAutoTryOnResult: (result: any | null) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  setAutoTryOnSearchResults: (results: any | null) => void;
+
   // Referral
   referral: ReferralData | null;
   setReferral: (referral: ReferralData) => void;
@@ -69,7 +79,7 @@ export const useStyleStore = create<StyleState>((set) => ({
   setProfile: (profile) => set({ profile }),
 
   selectedOccasion: null,
-  setSelectedOccasion: (selectedOccasion) => set({ selectedOccasion }),
+  setSelectedOccasion: (selectedOccasion) => set({ selectedOccasion, autoTryOnResult: null, autoTryOnSearchResults: null }),
 
   outfits: [],
   selectedOutfit: null,
@@ -85,6 +95,11 @@ export const useStyleStore = create<StyleState>((set) => ({
   setTryOnAnalysis: (tryOnAnalysis) => set({ tryOnAnalysis }),
   setTryOnImage: (tryOnImage) => set({ tryOnImage }),
   setTryOnLoading: (isTryOnLoading) => set({ isTryOnLoading }),
+
+  autoTryOnResult: null,
+  autoTryOnSearchResults: null,
+  setAutoTryOnResult: (autoTryOnResult) => set({ autoTryOnResult }),
+  setAutoTryOnSearchResults: (autoTryOnSearchResults) => set({ autoTryOnSearchResults }),
 
   referral: null,
   setReferral: (referral) => set({ referral }),
@@ -106,6 +121,8 @@ export const useStyleStore = create<StyleState>((set) => ({
       tryOnAnalysis: null,
       tryOnImage: null,
       isTryOnLoading: false,
+      autoTryOnResult: null,
+      autoTryOnSearchResults: null,
       referral: null,
     }),
 }));

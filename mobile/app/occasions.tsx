@@ -22,7 +22,7 @@ export default function OccasionsScreen() {
         </View>
       </SafeAreaView>
     );
-  }
+  }~
 
   return (
     <SafeAreaView style={styles.safe}>

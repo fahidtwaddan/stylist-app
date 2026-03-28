@@ -1,23 +1,18 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import ScanningAnimation from "@/components/ScanningAnimation";
 import { useStyleStore } from "@/store/useStyleStore";
 
-// Resize image client-side before uploading — smaller images = faster Vision API
+// Convert image to JPEG client-side and resize if needed.
+// This prevents unsupported formats (e.g. HEIC) from failing at the API layer.
 async function resizeImage(file: File, maxDim: number): Promise<File> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
-      // Skip resize if already small enough
-      if (img.width <= maxDim && img.height <= maxDim) {
-        resolve(file);
-        return;
-      }
-
-      const scale = maxDim / Math.max(img.width, img.height);
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
@@ -28,7 +23,8 @@ async function resizeImage(file: File, maxDim: number): Promise<File> {
       canvas.toBlob(
         (blob) => {
           if (blob) {
-            resolve(new File([blob], file.name, { type: "image/jpeg" }));
+            const safeName = file.name.replace(/\.[^/.]+$/, "") || "upload";
+            resolve(new File([blob], `${safeName}.jpg`, { type: "image/jpeg" }));
           } else {
             resolve(file);
           }
@@ -36,9 +32,14 @@ async function resizeImage(file: File, maxDim: number): Promise<File> {
         "image/jpeg",
         0.85
       );
+      URL.revokeObjectURL(img.src);
     };
-    img.onerror = () => resolve(file); // Fallback to original
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      resolve(file); // Fallback to original
+    };
+    const objectUrl = URL.createObjectURL(file);
+    img.src = objectUrl;
   });
 }
 
@@ -65,12 +66,16 @@ export default function AnalyzingPage() {
     setPhotoBase64,
   } = useStyleStore();
 
+  const hasRun = useRef(false);
+
   const runAnalysis = useCallback(async () => {
+    if (hasRun.current) return;
     if (!photoFile || !photo) {
       router.push("/");
       return;
     }
 
+    hasRun.current = true;
     setAnalyzing(true);
 
     // Simulate progress while API call runs
@@ -88,17 +93,17 @@ export default function AnalyzingPage() {
     }, 400);
 
     try {
-      // Save base64 for later try-on API
+      // Resize image before upload to speed up Vision API
+      const resizedFile = await resizeImage(photoFile, 1024);
+
+      // Save base64 of the normalized image for later try-on API
       const reader = new FileReader();
       reader.onload = () => {
         const dataUrl = reader.result as string;
         const base64 = dataUrl.split(",")[1];
-        setPhotoBase64(base64, photoFile.type);
+        setPhotoBase64(base64, resizedFile.type || "image/jpeg");
       };
-      reader.readAsDataURL(photoFile);
-
-      // Resize image before upload to speed up Vision API
-      const resizedFile = await resizeImage(photoFile, 1024);
+      reader.readAsDataURL(resizedFile);
 
       const formData = new FormData();
       formData.append("photo", resizedFile);
@@ -173,7 +178,7 @@ export default function AnalyzingPage() {
         <motion.button
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          onClick={runAnalysis}
+          onClick={() => { hasRun.current = false; runAnalysis(); }}
           className="mt-4 rounded-xl bg-gold-400 px-6 py-3 text-sm font-semibold text-black"
         >
           Retry Analysis

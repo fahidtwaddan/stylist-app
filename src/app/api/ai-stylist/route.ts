@@ -30,6 +30,16 @@ interface NamshiProduct {
   originalPrice: number;
   imageUrl: string;
   productUrl: string;
+  sku: string;
+  sizes: string[];
+}
+
+interface SearchResult {
+  query: string;
+  category: string;
+  candidates: { brand: string; title: string; imageUrl: string; price: number }[];
+  pickedIndex: number;
+  picked: NamshiProduct | null;
 }
 
 interface Job {
@@ -37,6 +47,8 @@ interface Job {
   status: "running" | "completed" | "failed";
   step: string;
   result?: Record<string, unknown>;
+  pickedProducts?: { top: NamshiProduct | null; bottom: NamshiProduct | null };
+  searchResults?: { top: SearchResult | null; bottom: SearchResult | null };
   error?: string;
   createdAt: number;
 }
@@ -77,15 +89,67 @@ async function searchNamshi(query: string): Promise<NamshiProduct[]> {
             const p = mod.product;
             const ik = (p.imageKeys || [])[0];
             if (!ik) continue;
+            const sizes: string[] = [];
+            for (const field of [p.sizes, p.availableSizes, p.sizeOptions, p.variants]) {
+              if (Array.isArray(field) && field.length > 0) {
+                for (const s of field) {
+                  if (typeof s === "string") sizes.push(s);
+                  else if (s?.label) sizes.push(s.label);
+                  else if (s?.size) sizes.push(String(s.size));
+                  else if (s?.value) sizes.push(String(s.value));
+                  else if (s?.name) sizes.push(s.name);
+                }
+                break;
+              }
+            }
+            // Extract SKU from URI: /brand-name-123456.html → 123456
+            const skuMatch = (p.uri || "").match(/-(\d+)\.html/);
             products.push({
               title: p.title || "", brand: p.brand || "",
               price: p.salePrice || p.normalPrice || 0, originalPrice: p.normalPrice || 0,
               imageUrl: `https://f.nooncdn.com/p/${ik}`,
               productUrl: `https://www.namshi.com${p.uri || ""}`,
+              sku: p.sku || p.parentSku || (skuMatch ? skuMatch[1] : ""),
+              sizes,
             });
           }
     return products;
   } catch { return []; }
+}
+
+// Fetch available sizes from Namshi product detail API
+async function fetchAvailableSizes(productUrl: string): Promise<string[]> {
+  if (!productUrl) return [];
+  try {
+    // Extract path: "/buy-brand-name/SKU/p/" from full URL or relative path
+    const path = productUrl.replace("https://www.namshi.com", "").replace(/^\//, "");
+    const apiUrl = `https://www.namshi.com/_svc/catalog/catalog/uae-en/${path}`;
+    const r = await fetch(apiUrl, {
+      headers: {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "accept": "application/json",
+      },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!r.ok) return [];
+    const json = await r.json();
+    const variants = json?.data?.product?.variants;
+    if (!Array.isArray(variants)) return [];
+
+    const available = variants
+      .filter((v: { stockInfo?: { code?: string }; maxQty?: number }) =>
+        v.stockInfo?.code !== "out_of_stock" && (v.maxQty === undefined || v.maxQty > 0)
+      )
+      .map((v: { title?: string; sizeUnitsConversions?: Record<string, string> }) =>
+        v.sizeUnitsConversions?.ALPHA || v.title || ""
+      )
+      .filter(Boolean);
+
+    return [...new Set(available)] as string[];
+  } catch (e) {
+    console.log("[Namshi] Size fetch failed:", (e as Error).message);
+    return [];
+  }
 }
 
 async function generateOutfit(photoBase64: string, mediaType: string, profile: Record<string, unknown>, occasion: string) {
@@ -119,27 +183,44 @@ async function aiPickBest(photoBase64: string, mediaType: string, itemDesc: stri
   } catch { return 0; }
 }
 
-async function findBestProduct(photoBase64: string, mediaType: string, item: { name: string; brand: string; category: string; searchQuery?: string }, profile: Record<string, unknown>): Promise<{ url: string; product?: NamshiProduct }> {
+async function findBestProduct(photoBase64: string, mediaType: string, item: { name: string; brand: string; category: string; searchQuery?: string }, profile: Record<string, unknown>): Promise<{ url: string; product?: NamshiProduct; searchResult?: SearchResult }> {
   const query = item.searchQuery || `${item.brand} ${item.name}`;
   const results = await searchNamshi(query);
   if (results.length > 0) {
-    const idx = await aiPickBest(photoBase64, mediaType, `${item.brand} ${item.name}`, results.slice(0, 8), profile);
-    return { url: results[idx].imageUrl, product: results[idx] };
+    const candidates = results.slice(0, 8);
+    const idx = await aiPickBest(photoBase64, mediaType, `${item.brand} ${item.name}`, candidates, profile);
+    const picked = results[idx];
+    // Try to fetch real available sizes from the product page
+    if (picked.sizes.length === 0 && picked.productUrl) {
+      picked.sizes = await fetchAvailableSizes(picked.productUrl);
+      if (picked.sizes.length > 0) console.log(`[Namshi] Got sizes for ${picked.title}:`, picked.sizes);
+    }
+    const searchResult: SearchResult = {
+      query,
+      category: item.category,
+      candidates: candidates.map((c) => ({ brand: c.brand, title: c.title, imageUrl: c.imageUrl, price: c.price })),
+      pickedIndex: idx,
+      picked,
+    };
+    return { url: picked.imageUrl, product: picked, searchResult };
   }
   const catalogUrl = findGarmentImage(query, item.category);
   return { url: catalogUrl || "" };
 }
 
 async function fashnTryOn(model: string, garment: string, cat: "tops" | "bottoms"): Promise<string | null> {
-  if (!fashn) return null;
+  if (!fashn) { console.log("[FASHN] No API key configured"); return null; }
+  console.log(`[FASHN][${cat}] Starting try-on. Model: ${model.slice(0, 50)}... Garment: ${garment.slice(0, 80)}...`);
   try {
     const r = await fashn.predictions.subscribe({
       model_name: "tryon-v1.6",
       inputs: { model_image: model, garment_image: garment, category: cat, mode: "quality", garment_photo_type: "auto", num_samples: 1, output_format: "png" },
       onQueueUpdate: (s) => console.log(`[FASHN][${cat}] ${s.status}`),
     });
+    console.log(`[FASHN][${cat}] Result status: ${r.status}, has output: ${!!r.output?.[0]}`);
+    if (r.status !== "completed") console.log(`[FASHN][${cat}] Full result:`, JSON.stringify(r).slice(0, 500));
     return r.status === "completed" && r.output?.[0] ? r.output[0] : null;
-  } catch (e) { console.error("[FASHN]", e); return null; }
+  } catch (e) { console.error(`[FASHN][${cat}] Error:`, e); return null; }
 }
 
 async function downloadToDataUri(url: string): Promise<string> {
@@ -158,7 +239,7 @@ async function analyzeOutfit(photoBase64: string, mediaType: string, outfit: { n
     model: "claude-haiku-4-5-20251001", max_tokens: 1000,
     messages: [{ role: "user", content: [
       { type: "image", source: { type: "base64", media_type: mediaType as "image/jpeg" | "image/png" | "image/webp" | "image/gif", data: photoBase64 } },
-      { type: "text", text: `You are a world-class stylist. This person is trying on:\n\n**${outfit.name}**\n${items}\n\nProfile: ${(profile as { archetype?: string }).archetype || ""}, ${(profile as { colorSeason?: string }).colorSeason || ""}, ${(profile as { bodyType?: string }).bodyType || ""}\n\nReturn JSON: {"overallLook":"...","fitAnalysis":"...","colorHarmony":"...","stylingTips":["tip1","tip2","tip3"],"confidenceScore":88,"verdict":"..."}` },
+      { type: "text", text: `You are a world-class stylist. This person is trying on:\n\n**${outfit.name}**\n${items}\n\nProfile: ${(profile as { archetype?: string }).archetype || ""}, ${(profile as { colorSeason?: string }).colorSeason || ""}, ${(profile as { bodyType?: string }).bodyType || ""}\n\nReturn JSON: {"overallLook":"1 short sentence max 15 words","fitAnalysis":"1 short sentence max 12 words","colorHarmony":"1 short sentence max 12 words","stylingTips":["short tip 1","short tip 2","short tip 3"],"confidenceScore":88,"verdict":"1 punchy sentence max 10 words"}\n\nIMPORTANT: Keep ALL text very brief and punchy. No fluff. Each field max 1 short sentence.` },
     ]}],
   });
   const tb = r.content.find((b) => b.type === "text");
@@ -195,6 +276,16 @@ async function runPipeline(jobId: string, photoBase64: string, mediaType: string
 
     job.step = "AI selected the best products for you";
 
+    // Store intermediate search results + picks so the frontend can show the process
+    job.searchResults = {
+      top: topMatch?.searchResult || null,
+      bottom: bottomMatch?.searchResult || null,
+    };
+    job.pickedProducts = {
+      top: topMatch?.product || null,
+      bottom: bottomMatch?.product || null,
+    };
+
     const pickedProducts = [
       ...(topMatch?.product ? [{ category: topItem?.category || "tops", product: topMatch.product }] : []),
       ...(bottomMatch?.product ? [{ category: "bottoms", product: bottomMatch.product }] : []),
@@ -204,7 +295,8 @@ async function runPipeline(jobId: string, photoBase64: string, mediaType: string
     job.step = "Generating virtual try-on (top)...";
 
     const runFashn = async (): Promise<string | null> => {
-      if (!fashn) return null;
+      if (!fashn) { console.log("[Pipeline] FASHN not available, skipping try-on"); return null; }
+      console.log(`[Pipeline] Starting FASHN. topUrl: ${topMatch?.url?.slice(0, 60)}, bottomUrl: ${bottomMatch?.url?.slice(0, 60)}`);
       let img = personUri;
       if (topMatch?.url) {
         job.step = "Fitting the top on you...";
@@ -240,8 +332,8 @@ async function runPipeline(jobId: string, photoBase64: string, mediaType: string
       analysis,
       tryOnImage,
       products: {
-        top: topMatch?.product ? { brand: topMatch.product.brand, title: topMatch.product.title, price: topMatch.product.price, originalPrice: topMatch.product.originalPrice, productUrl: topMatch.product.productUrl, imageUrl: topMatch.product.imageUrl } : null,
-        bottom: bottomMatch?.product ? { brand: bottomMatch.product.brand, title: bottomMatch.product.title, price: bottomMatch.product.price, originalPrice: bottomMatch.product.originalPrice, productUrl: bottomMatch.product.productUrl, imageUrl: bottomMatch.product.imageUrl } : null,
+        top: topMatch?.product ? { brand: topMatch.product.brand, title: topMatch.product.title, price: topMatch.product.price, originalPrice: topMatch.product.originalPrice, productUrl: topMatch.product.productUrl, imageUrl: topMatch.product.imageUrl, sizes: topMatch.product.sizes } : null,
+        bottom: bottomMatch?.product ? { brand: bottomMatch.product.brand, title: bottomMatch.product.title, price: bottomMatch.product.price, originalPrice: bottomMatch.product.originalPrice, productUrl: bottomMatch.product.productUrl, imageUrl: bottomMatch.product.imageUrl, sizes: bottomMatch.product.sizes } : null,
       },
     };
     console.log(`[Job ${jobId}] Completed successfully`);
@@ -312,9 +404,11 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Still running
+  // Still running — include search results + picked products if available
   return NextResponse.json({
     status: "running",
     step: job.step,
+    ...(job.searchResults ? { searchResults: job.searchResults } : {}),
+    ...(job.pickedProducts ? { pickedProducts: job.pickedProducts } : {}),
   });
 }

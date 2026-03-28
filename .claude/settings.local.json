@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(curl -s 'https://apiv2.namshi.com/_svc/catalog/product/ZA6BF3CCF45FF0AE0FE8CZ' -H 'accept: application/json' -H 'x-mp: namshi_v2' -H 'x-platform: android' -H 'x-cms: v2' -H 'x-content: mobile' -H 'content-type: application/json' -H 'x-device-id: f027dee88bac2c16' -H 'x-build: 17630' -H 'x-device-type: mobile' -H 'x-appversion: 15.2' -H 'x-visitor-id: 69b6aeee-8535-4eca-abab-3f39ccdd8e1f' -H 'x-locale: en-ae' -H 'user-agent: okhttp/4.12.0')",
+      "Bash(npx next:*)"
+    ]
+  }
+}

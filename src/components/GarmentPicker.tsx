@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface GarmentOption {
@@ -53,9 +54,12 @@ export default function GarmentPicker({
   const [activeTab, setActiveTab] = useState(tryableItems[0]?.category || "tops");
   // State: loading
   const [loading, setLoading] = useState(true);
+  const hasRun = useRef(false);
 
   // Fetch garment options for all tryable items
   const fetchOptions = useCallback(async () => {
+    if (hasRun.current) return;
+    hasRun.current = true;
     setLoading(true);
     const results: Record<string, GarmentOption[]> = {};
 

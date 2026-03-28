@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzePhoto } from "@/lib/claude";
 
+const SUPPORTED_MEDIA_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+] as const;
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -13,12 +20,10 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const base64 = Buffer.from(bytes).toString("base64");
 
-    // Default to image/jpeg if file type is missing
-    const mediaType = (file.type || "image/jpeg") as
-      | "image/jpeg"
-      | "image/png"
-      | "image/webp"
-      | "image/gif";
+    // Normalize to supported image types.
+    const mediaType = (SUPPORTED_MEDIA_TYPES.includes(file.type as (typeof SUPPORTED_MEDIA_TYPES)[number])
+      ? (file.type as (typeof SUPPORTED_MEDIA_TYPES)[number])
+      : "image/jpeg") as "image/jpeg" | "image/png" | "image/webp" | "image/gif";
 
     const profile = await analyzePhoto(base64, mediaType);
 

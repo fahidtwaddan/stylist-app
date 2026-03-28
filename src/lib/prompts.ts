@@ -7,11 +7,11 @@ Analyze this photo and provide a comprehensive style profile. Return your analys
   "skinTone": "Descriptive skin tone (e.g., warm olive, cool beige, deep mahogany)",
   "colorSeason": "One of: Spring (warm+light), Summer (cool+light), Autumn (warm+deep), Winter (cool+deep)",
   "archetype": "A creative fashion archetype name (e.g., Desert Minimalist, Urban Sheikh, Coastal Luxe)",
-  "personality": "2-3 sentence personality description based on visual cues",
-  "narrative": "A compelling 3-4 sentence editorial-style narrative about their style DNA",
+  "personality": "1 punchy sentence max 15 words",
+  "narrative": "1-2 short editorial sentences max 25 words total",
   "colorPalette": ["Array of 6 hex color codes that would look amazing on this person"],
   "avoidColors": ["Array of 3 hex color codes to avoid"],
-  "recommendations": ["Array of 5 specific style recommendations for the GCC market"]
+  "recommendations": ["Array of 5 short tips, each max 10 words"]
 }
 
 Be creative, specific, and culturally aware of the GCC fashion scene. Consider the climate (hot), lifestyle (luxury-oriented), and fashion preferences of the region. Return ONLY the JSON object, no other text.`;

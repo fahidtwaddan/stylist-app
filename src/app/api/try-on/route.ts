@@ -284,15 +284,15 @@ Their style profile: ${profile?.archetype || "Fashion forward"}, ${profile?.colo
 
 Provide a virtual try-on analysis as JSON:
 {
-  "overallLook": "2-3 vivid sentences describing exactly how this complete outfit would look ON THIS SPECIFIC PERSON — reference their features, build, skin tone, hair",
-  "fitAnalysis": "2 sentences on how the silhouette and proportions work with their body type",
-  "colorHarmony": "1-2 sentences on how the outfit colors complement their natural coloring",
-  "stylingTips": ["3 specific tips to make this outfit work even better on them"],
+  "overallLook": "1 short sentence max 15 words — how the outfit looks on them",
+  "fitAnalysis": "1 short sentence max 12 words — how the fit works",
+  "colorHarmony": "1 short sentence max 12 words — how colors complement them",
+  "stylingTips": ["short tip 1","short tip 2","short tip 3"],
   "confidenceScore": 88,
-  "verdict": "A punchy 1-sentence verdict like a fashion editor would write"
+  "verdict": "punchy 1-liner max 10 words"
 }
 
-Be specific to THIS person — reference what you actually see in the photo. Be encouraging but honest. Return ONLY JSON.`;
+Be specific to THIS person. Keep ALL text very brief and punchy — no fluff. Return ONLY JSON.`;
 
   const response = await anthropic.messages.create({
     model: "claude-haiku-4-5-20251001",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import OutfitCard from "@/components/OutfitCard";
@@ -19,9 +19,13 @@ export default function OutfitsPage() {
     setLoadingOutfits,
   } = useStyleStore();
 
+  const hasRun = useRef(false);
+
   const loadOutfits = useCallback(async () => {
+    if (hasRun.current) return;
     if (!profile || !selectedOccasion) return;
     if (outfits.length > 0) return;
+    hasRun.current = true;
 
     setLoadingOutfits(true);
 
