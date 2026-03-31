@@ -1,4 +1,5 @@
 export interface StyleProfile {
+  gender: "men" | "women";
   bodyType: string;
   skinTone: string;
   colorSeason: string;

@@ -2,13 +2,25 @@ import { create } from "zustand";
 import type { StyleProfile, Outfit, ReferralData, TryOnAnalysis } from "@/lib/types";
 
 interface StyleState {
+  // Gender
+  gender: "men" | "women" | null;
+  setGender: (gender: "men" | "women") => void;
+
+  // Body measurements
+  height: string;
+  weight: string;
+  setHeight: (height: string) => void;
+  setWeight: (weight: string) => void;
+
   // Photo
   photo: string | null;
   photoFile: File | null;
   photoBase64: string | null;
   photoMediaType: string | null;
+  bodyShapeImage: string | null;
   setPhoto: (photo: string | null, file?: File | null) => void;
   setPhotoBase64: (base64: string, mediaType: string) => void;
+  setBodyShapeImage: (image: string | null) => void;
 
   // Analysis
   isAnalyzing: boolean;
@@ -60,13 +72,23 @@ interface StyleState {
 }
 
 export const useStyleStore = create<StyleState>((set) => ({
+  gender: null,
+  setGender: (gender) => set({ gender }),
+
+  height: "",
+  weight: "",
+  setHeight: (height) => set({ height }),
+  setWeight: (weight) => set({ weight }),
+
   photo: null,
   photoFile: null,
   photoBase64: null,
   photoMediaType: null,
+  bodyShapeImage: null,
   setPhoto: (photo, file = null) => set({ photo, photoFile: file }),
   setPhotoBase64: (photoBase64, photoMediaType) =>
     set({ photoBase64, photoMediaType }),
+  setBodyShapeImage: (bodyShapeImage) => set({ bodyShapeImage }),
 
   isAnalyzing: false,
   analysisProgress: 0,
@@ -106,10 +128,14 @@ export const useStyleStore = create<StyleState>((set) => ({
 
   reset: () =>
     set({
+      gender: null,
+      height: "",
+      weight: "",
       photo: null,
       photoFile: null,
       photoBase64: null,
       photoMediaType: null,
+      bodyShapeImage: null,
       isAnalyzing: false,
       analysisProgress: 0,
       analysisStage: "",

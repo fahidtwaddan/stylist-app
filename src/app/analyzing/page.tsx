@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import ScanningAnimation from "@/components/ScanningAnimation";
 import { useStyleStore } from "@/store/useStyleStore";
 
@@ -44,6 +44,7 @@ async function resizeImage(file: File, maxDim: number): Promise<File> {
 }
 
 const ANALYSIS_STAGES = [
+  "Validating your photo...",
   "Detecting body proportions...",
   "Analyzing skin tone...",
   "Mapping color season...",
@@ -64,9 +65,12 @@ export default function AnalyzingPage() {
     setProfile,
     setAnalyzing,
     setPhotoBase64,
+    setGender,
+    setPhoto,
   } = useStyleStore();
 
   const hasRun = useRef(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const runAnalysis = useCallback(async () => {
     if (hasRun.current) return;
@@ -77,6 +81,7 @@ export default function AnalyzingPage() {
 
     hasRun.current = true;
     setAnalyzing(true);
+    setValidationError(null);
 
     // Simulate progress while API call runs
     let progress = 0;
@@ -120,6 +125,12 @@ export default function AnalyzingPage() {
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
+        if (err.validationFailed) {
+          clearInterval(interval);
+          setAnalyzing(false);
+          setValidationError(err.error);
+          return;
+        }
         throw new Error(err.error || "Analysis failed");
       }
 
@@ -127,6 +138,7 @@ export default function AnalyzingPage() {
 
       clearInterval(interval);
       setAnalysisProgress(100, "Complete!");
+      if (data.profile.gender) setGender(data.profile.gender);
       setProfile(data.profile);
 
       setTimeout(() => {
@@ -143,16 +155,55 @@ export default function AnalyzingPage() {
         isTimeout ? "Timed out — tap to retry" : "Error — tap to retry"
       );
     }
-  }, [photoFile, photo, router, setAnalyzing, setAnalysisProgress, setProfile, setPhotoBase64]);
+  }, [photoFile, photo, router, setAnalyzing, setAnalysisProgress, setProfile, setPhotoBase64, setGender, setPhoto]);
 
   useEffect(() => {
     runAnalysis();
   }, [runAnalysis]);
 
+  const handleGoBack = () => {
+    setPhoto(null);
+    setValidationError(null);
+    router.push("/");
+  };
+
   if (!photo) return null;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-5 py-8">
+      {/* Validation Error Overlay */}
+      <AnimatePresence>
+        {validationError && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-6"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-sm rounded-3xl bg-[#1a1a2e] border border-red-500/30 p-6 text-center"
+            >
+              <div className="h-14 w-14 mx-auto rounded-full bg-red-500/15 flex items-center justify-center mb-4">
+                <svg className="h-7 w-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">Photo Rejected</h3>
+              <p className="text-sm text-white/60 mb-6 leading-relaxed">{validationError}</p>
+              <button
+                onClick={handleGoBack}
+                className="w-full rounded-2xl bg-gradient-to-r from-gold-400 to-gold-500 py-3.5 text-sm font-bold text-black"
+              >
+                Try Again
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

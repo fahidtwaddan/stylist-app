@@ -25,10 +25,17 @@ export async function POST(request: NextRequest) {
       ? (file.type as (typeof SUPPORTED_MEDIA_TYPES)[number])
       : "image/jpeg") as "image/jpeg" | "image/png" | "image/webp" | "image/gif";
 
-    const profile = await analyzePhoto(base64, mediaType);
+    const result = await analyzePhoto(base64, mediaType);
+
+    if (result.validation === "failed") {
+      return NextResponse.json(
+        { error: result.reason, validationFailed: true },
+        { status: 422 }
+      );
+    }
 
     return NextResponse.json({
-      profile,
+      profile: result,
       confidence: 0.92,
     });
   } catch (error) {

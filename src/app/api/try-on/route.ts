@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import Fashn from "fashn";
 import { findGarmentImage } from "@/lib/garment-images";
+import fs from "fs";
+import path from "path";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -197,39 +199,37 @@ async function findBestGarment(
   return catalogUrl ? { url: catalogUrl } : null;
 }
 
-// ─── Single FASHN try-on call ────────────────────────────────────────
-async function fashnTryOn(
+// ─── FASHN product-to-model call ────────────────────────────────────
+async function fashnProductToModel(
   modelImage: string,
   garmentUrl: string,
-  category: "tops" | "bottoms" | "auto"
+  promptText: string
 ): Promise<string | null> {
   if (!fashn) return null;
 
   try {
     const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => {
-      console.log(`[FASHN][${category}] Timed out after 60s`);
+      console.log(`[FASHN] Timed out after 60s`);
       resolve(null);
     }, 60000));
 
     const fashnPromise = fashn.predictions.subscribe({
-    model_name: "tryon-v1.6",
-    inputs: {
-      model_image: modelImage,
-      garment_image: garmentUrl,
-      category,
-      mode: "balanced",
-      garment_photo_type: "auto",
-      num_samples: 1,
-      output_format: "png",
-    },
-    onQueueUpdate: (status) => {
-      console.log(`[FASHN][${category}] ${status.status}`);
-    },
-  }).then(r => r.status === "completed" && r.output?.[0] ? r.output[0] : null);
+      model_name: "product-to-model",
+      inputs: {
+        model_image: modelImage,
+        product_image: garmentUrl,
+        prompt: promptText,
+        resolution: "1k",
+        output_format: "png",
+      },
+      onQueueUpdate: (status) => {
+        console.log(`[FASHN] ${status.status}`);
+      },
+    }).then(r => r.status === "completed" && r.output?.[0] ? r.output[0] : null);
 
     return await Promise.race([fashnPromise, timeoutPromise]);
   } catch (e) {
-    console.error(`[FASHN][${category}] Error:`, e);
+    console.error(`[FASHN] Error:`, e);
     return null;
   }
 }
@@ -328,17 +328,40 @@ Be specific to THIS person. Keep ALL text very brief and punchy — no fluff. Re
 // ─── Main Handler ────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
-    const { photoBase64, mediaType, outfit, profile } = await request.json();
+    const { photoBase64, mediaType, outfit, profile, bodyShapeImage } = await request.json();
 
-    if (!photoBase64 || !outfit) {
+    if (!outfit) {
       return NextResponse.json(
-        { error: "Photo and outfit are required" },
+        { error: "Outfit is required" },
         { status: 400 }
       );
     }
 
     const resolvedMediaType = mediaType || "image/jpeg";
-    const personDataUri = `data:${resolvedMediaType};base64,${photoBase64}`;
+    const hasPhoto = !!photoBase64;
+    let personDataUri = hasPhoto ? `data:${resolvedMediaType};base64,${photoBase64}` : "";
+
+    // For body-type users: read body shape image from public/ as model
+    if (!hasPhoto && bodyShapeImage) {
+      try {
+        const filePath = path.join(process.cwd(), "public", decodeURIComponent(bodyShapeImage));
+        console.log(`[Try-On] Reading body shape image: ${filePath}`);
+        const buf = fs.readFileSync(filePath);
+        const ext = path.extname(filePath).toLowerCase();
+        const mime = ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : "image/png";
+        personDataUri = `data:${mime};base64,${buf.toString("base64")}`;
+        console.log(`[Try-On] Body shape image loaded (${(buf.length / 1024).toFixed(0)}KB)`);
+      } catch (e) {
+        console.error("[Try-On] Failed to load body shape image:", e);
+      }
+    }
+
+    if (!personDataUri) {
+      return NextResponse.json(
+        { error: "Photo or body shape image is required" },
+        { status: 400 }
+      );
+    }
 
     // ── Step 1: AI finds best garments (live Namshi search + Claude Vision pick) ──
     const topItem = outfit.items.find(
@@ -351,32 +374,36 @@ export async function POST(request: NextRequest) {
     // Search for top and bottom in parallel
     const [topMatch, bottomMatch] = await Promise.all([
       topItem
-        ? findBestGarment(photoBase64, resolvedMediaType, topItem, profile)
+        ? findBestGarment(hasPhoto ? photoBase64 : "", resolvedMediaType, topItem, profile)
         : Promise.resolve(null),
       bottomItem
-        ? findBestGarment(photoBase64, resolvedMediaType, bottomItem, profile)
+        ? findBestGarment(hasPhoto ? photoBase64 : "", resolvedMediaType, bottomItem, profile)
         : Promise.resolve(null),
     ]);
 
     console.log("[Try-On] Top:", topMatch?.product?.brand || topMatch?.url?.substring(0, 50) || "none");
     console.log("[Try-On] Bottom:", bottomMatch?.product?.brand || bottomMatch?.url?.substring(0, 50) || "none");
 
-    // ── Step 2: FASHN try-on (chained) + Claude analysis in parallel ──
+    // Get fashn prompts from outfit items
+    const topFashnPrompt = topItem?.fashnPrompt || `apply this ${topItem?.name || "top"}`;
+    const bottomFashnPrompt = bottomItem?.fashnPrompt || `apply this ${bottomItem?.name || "bottom"}`;
+
+    // ── Step 2: FASHN product-to-model (chained) + Claude analysis in parallel ──
     const pickedProducts = [
       ...(topMatch?.product ? [{ category: topItem?.category || "tops", product: topMatch.product }] : []),
       ...(bottomMatch?.product ? [{ category: "bottoms", product: bottomMatch.product }] : []),
     ];
 
-    // FASHN chained try-on
+    // FASHN chained product-to-model: apply top, then bottom on result
     const runFashnChain = async (): Promise<string | null> => {
-      if (!fashn) return null;
+      if (!fashn || !personDataUri) return null;
 
       let currentImage = personDataUri;
 
-      // Apply top
+      // Step 1: Apply top garment
       if (topMatch?.url) {
-        console.log("[FASHN] Applying top...");
-        const topResult = await fashnTryOn(currentImage, topMatch.url, "tops");
+        console.log("[FASHN] Applying top via product-to-model...");
+        const topResult = await fashnProductToModel(currentImage, topMatch.url, topFashnPrompt);
         if (topResult) {
           if (bottomMatch?.url) {
             currentImage = await imageUrlToDataUri(topResult);
@@ -386,19 +413,21 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Apply bottom
+      // Step 2: Apply bottom garment on the result
       if (bottomMatch?.url) {
-        console.log("[FASHN] Applying bottom...");
-        const bottomResult = await fashnTryOn(currentImage, bottomMatch.url, "bottoms");
+        console.log("[FASHN] Applying bottom via product-to-model...");
+        const bottomResult = await fashnProductToModel(currentImage, bottomMatch.url, bottomFashnPrompt);
         if (bottomResult) return bottomResult;
       }
 
       return null;
-    }
+    };
 
     const [tryOnImageUrl, claudeAnalysis] = await Promise.all([
       runFashnChain(),
-      runClaudeAnalysis(photoBase64, resolvedMediaType, outfit, profile, pickedProducts),
+      hasPhoto
+        ? runClaudeAnalysis(photoBase64, resolvedMediaType, outfit, profile, pickedProducts)
+        : runClaudeAnalysis("", resolvedMediaType, outfit, profile, pickedProducts),
     ]);
 
     // ── Step 3: Return results with product info ──

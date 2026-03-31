@@ -23,6 +23,7 @@ export default function TryOnPage() {
     photoBase64,
     photoMediaType,
     profile,
+    bodyShapeImage,
     tryOnAnalysis,
     tryOnImage,
     isTryOnLoading,
@@ -30,6 +31,8 @@ export default function TryOnPage() {
     setTryOnImage,
     setTryOnLoading,
   } = useStyleStore();
+
+  const displayPhoto = photo || bodyShapeImage;
 
   const [showGenerated, setShowGenerated] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -53,19 +56,20 @@ export default function TryOnPage() {
 
   const runTryOn = useCallback(async () => {
     if (hasRun.current) return;
-    if (!selectedOutfit || !photo) return;
+    if (!selectedOutfit || !displayPhoto) return;
     if (tryOnAnalysis) return;
     hasRun.current = true;
 
     let b64 = photoBase64;
     let mType = photoMediaType;
-    if (!b64 && photo.startsWith("data:")) {
+    if (!b64 && photo && photo.startsWith("data:")) {
       const [header, data] = photo.split(",");
       b64 = data;
       const mimeMatch = header.match(/data:(image\/\w+)/);
       mType = mimeMatch ? mimeMatch[1] : "image/jpeg";
     }
-    if (!b64) return;
+    // Allow body-type users (no photo) to proceed with bodyShapeImage
+    if (!b64 && !bodyShapeImage) return;
 
     setTryOnLoading(true);
     try {
@@ -73,10 +77,11 @@ export default function TryOnPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          photoBase64: b64,
+          photoBase64: b64 || null,
           mediaType: mType || "image/jpeg",
           outfit: selectedOutfit,
           profile,
+          bodyShapeImage: !b64 && bodyShapeImage ? bodyShapeImage : null,
         }),
       });
 
@@ -97,6 +102,7 @@ export default function TryOnPage() {
     }
   }, [
     selectedOutfit, photo, photoBase64, photoMediaType, profile,
+    bodyShapeImage, displayPhoto,
     tryOnAnalysis, setTryOnAnalysis, setTryOnImage, setTryOnLoading,
   ]);
 
@@ -104,7 +110,7 @@ export default function TryOnPage() {
     runTryOn();
   }, [runTryOn]);
 
-  if (!selectedOutfit || !photo) {
+  if (!selectedOutfit || !displayPhoto) {
     return (
       <div className="flex min-h-screen items-center justify-center px-5">
         <div className="text-center space-y-4">
@@ -142,7 +148,7 @@ export default function TryOnPage() {
         >
           <div className="relative aspect-[3/4] rounded-3xl overflow-hidden">
             <img
-              src={photo}
+              src={displayPhoto}
               alt="You"
               className="h-full w-full object-cover opacity-40"
             />
@@ -248,7 +254,7 @@ export default function TryOnPage() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.98 }}
                 >
-                  <TryOnView outfit={selectedOutfit} photoUrl={photo} onShop={handleShop} />
+                  <TryOnView outfit={selectedOutfit} photoUrl={displayPhoto!} onShop={handleShop} />
                 </motion.div>
               )}
             </AnimatePresence>

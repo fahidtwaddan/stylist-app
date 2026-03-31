@@ -8,12 +8,6 @@ import GlassCard from "../src/components/GlassCard";
 import { useStyleStore } from "../src/store/useStyleStore";
 import { COLORS } from "../src/lib/constants";
 
-const STATS = [
-  { value: "50K+", label: "Styles Created" },
-  { value: "6", label: "GCC Stores" },
-  { value: "98%", label: "Match Rate" },
-];
-
 const STEPS = [
   { step: "01", text: "Upload photo" },
   { step: "02", text: "AI analyzes" },
@@ -46,16 +40,6 @@ export default function LandingScreen() {
             photoUri={null}
             onPhotoSelected={handlePhotoSelected}
           />
-        </Animated.View>
-
-        {/* Stats */}
-        <Animated.View entering={FadeInDown.delay(400)} style={styles.statsRow}>
-          {STATS.map((stat, i) => (
-            <GlassCard key={i} style={styles.statCard}>
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-            </GlassCard>
-          ))}
         </Animated.View>
 
         {/* Brand Strip */}

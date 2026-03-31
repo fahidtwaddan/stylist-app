@@ -9,6 +9,7 @@ interface OccasionCardProps {
   isSelected: boolean;
   onClick: () => void;
   index: number;
+  previewImage?: string;
 }
 
 export default function OccasionCard({
@@ -18,35 +19,52 @@ export default function OccasionCard({
   isSelected,
   onClick,
   index,
+  previewImage,
 }: OccasionCardProps) {
   return (
     <motion.button
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.08 }}
+      transition={{ delay: index * 0.06 }}
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className={`w-full text-left rounded-2xl p-4 transition-all duration-200 ${
+      className={`w-full text-left rounded-2xl p-3 transition-all duration-200 ${
         isSelected
           ? "bg-gold-400/20 border-2 border-gold-400"
           : "glass hover:bg-white/10"
       }`}
     >
-      <div className="flex items-start gap-3">
-        <span className="text-2xl">{icon}</span>
+      <div className="flex items-center gap-3">
+        {/* Preview image */}
+        {previewImage ? (
+          <div className="relative h-20 w-14 rounded-xl overflow-hidden flex-shrink-0 border border-white/10">
+            <img
+              src={previewImage}
+              alt={name}
+              className="h-full w-full object-cover"
+            />
+          </div>
+        ) : (
+          <span className="text-2xl flex-shrink-0 w-14 text-center">{icon}</span>
+        )}
+
         <div className="flex-1 min-w-0">
-          <h3
-            className={`font-semibold ${
-              isSelected ? "text-gold-300" : "text-white"
-            }`}
-          >
-            {name}
-          </h3>
+          <div className="flex items-center gap-2">
+            {previewImage && <span className="text-lg">{icon}</span>}
+            <h3
+              className={`font-semibold ${
+                isSelected ? "text-gold-300" : "text-white"
+              }`}
+            >
+              {name}
+            </h3>
+          </div>
           <p className="mt-0.5 text-xs text-white/50 line-clamp-2">
             {description}
           </p>
         </div>
+
         {isSelected && (
           <motion.div
             initial={{ scale: 0 }}
