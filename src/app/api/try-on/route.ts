@@ -213,19 +213,22 @@ async function fashnProductToModel(
       resolve(null);
     }, 60000));
 
-    const fashnPromise = fashn.predictions.subscribe({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fashnPromise = (fashn.predictions.subscribe as any)({
       model_name: "product-to-model",
       inputs: {
         model_image: modelImage,
         product_image: garmentUrl,
         prompt: promptText,
+        mode: "fast",
         resolution: "1k",
         output_format: "png",
       },
-      onQueueUpdate: (status) => {
+      onQueueUpdate: (status: { status: string }) => {
         console.log(`[FASHN] ${status.status}`);
       },
-    }).then(r => r.status === "completed" && r.output?.[0] ? r.output[0] : null);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }).then((r: any) => r.status === "completed" && r.output?.[0] ? r.output[0] : null);
 
     return await Promise.race([fashnPromise, timeoutPromise]);
   } catch (e) {

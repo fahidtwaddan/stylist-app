@@ -338,17 +338,20 @@ async function fashnProductToModel(model: string, garment: string, promptText: s
   if (!fashn) { console.log("[FASHN] No API key configured"); return null; }
   console.log(`[FASHN] product-to-model: "${promptText}", model=${model.substring(0, 30)}..., garment=${garment.substring(0, 50)}...`);
   try {
-    const r = await fashn.predictions.subscribe({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = await (fashn.predictions.subscribe as any)({
       model_name: "product-to-model",
       inputs: {
         model_image: model,
         product_image: garment,
         prompt: promptText,
+        mode: "fast",
         resolution: "1k",
         output_format: "png",
       },
-      onQueueUpdate: (s) => console.log(`[FASHN] ${s.status}`),
-    });
+      onQueueUpdate: (s: { status: string }) => console.log(`[FASHN] ${s.status}`),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any;
     console.log(`[FASHN] Result: ${r.status}, has output: ${!!r.output?.[0]}`);
     return r.status === "completed" && r.output?.[0] ? r.output[0] : null;
   } catch (e) { console.error(`[FASHN] Error:`, e); return null; }
@@ -420,53 +423,43 @@ async function runPipeline(jobId: string, photoBase64: string, mediaType: string
     const outfits = await generate3Outfits(photoBase64, mt, profile, occasion, gender, sizeInfo, height, weight);
     console.log(`[Job ${jobId}] Got ${outfits.length} outfits: ${outfits.map((o: { name: string }) => o.name).join(", ")}`);
 
-    // Process each outfit
-    for (let i = 0; i < Math.min(outfits.length, 3); i++) {
-      const outfit = outfits[i];
-      job.currentOutfitIndex = i;
-      job.step = `Look ${i + 1}/3: Searching products for "${outfit.name}"...`;
+    // Process all 3 outfits in parallel for speed
+    job.step = "Searching products & generating try-ons for all 3 looks...";
 
-      const topItem = outfit.items.find((item: { category: string }) => item.category === "tops" || item.category === "outerwear");
-      const bottomItem = outfit.items.find((item: { category: string }) => item.category === "bottoms");
+    const formatProduct = (p: NamshiProduct) => ({
+      brand: p.brand, title: p.title, price: p.price,
+      originalPrice: p.originalPrice, productUrl: p.productUrl,
+      imageUrl: p.imageUrl, sizes: p.sizes, sku: p.sku,
+    });
 
-      // Search with exclusion of already-picked SKUs + size preference
+    const processOutfit = async (outfit: { name: string; items: { name: string; brand: string; category: string; price: number; currency: string; searchQuery?: string; fashnPrompt?: string }[]; totalPrice: number }, i: number) => {
+      console.log(`[Job ${jobId}] Look ${i + 1}/3: Starting "${outfit.name}"...`);
+
+      const topItem = outfit.items.find((item) => item.category === "tops" || item.category === "outerwear");
+      const bottomItem = outfit.items.find((item) => item.category === "bottoms");
+
       const topUserSize = sizeInfo?.alpha;
-      const bottomUserSize = sizeInfo?.alpha; // Namshi uses alpha sizes for most bottoms too
+      const bottomUserSize = sizeInfo?.alpha;
       const [topMatch, bottomMatch] = await Promise.all([
         topItem ? findBestProduct(photoBase64, mt, topItem, profile, gender, usedSkus, topUserSize) : Promise.resolve(null),
         bottomItem ? findBestProduct(photoBase64, mt, bottomItem, profile, gender, usedSkus, bottomUserSize) : Promise.resolve(null),
       ]);
 
-      // Track picked SKUs to avoid repeats
       if (topMatch?.product) usedSkus.push(topMatch.product.sku);
       if (bottomMatch?.product) usedSkus.push(bottomMatch.product.sku);
 
-      // Expose search results live so frontend can show them during try-on
-      job.liveSearchResults = {
-        top: topMatch?.searchResult || null,
-        bottom: bottomMatch?.searchResult || null,
-      };
-
-      job.step = `Look ${i + 1}/3: Generating try-on & analysis...`;
-
-      // Get FASHN prompts from Claude's outfit items (dynamic, not hardcoded)
       const topFashnPrompt = topItem?.fashnPrompt || `apply this ${topItem?.name || "top"}`;
       const bottomFashnPrompt = bottomItem?.fashnPrompt || `apply this ${bottomItem?.name || "bottom"}`;
 
-      // FASHN: product-to-model — apply top then bottom sequentially
+      // FASHN: product-to-model — apply top then bottom
       const runFashn = async (): Promise<string | null> => {
         if (!fashn || !personUri) return null;
-
-        // Start with user photo or body shape image as model
         let img = personUri;
 
-        // Step 1: Apply top garment
         if (topMatch?.url) {
-          job.step = `Look ${i + 1}/3: ${topFashnPrompt}...`;
           const r = await fashnProductToModel(img, topMatch.url, topFashnPrompt);
           if (r) {
             if (bottomMatch?.url) {
-              job.step = `Look ${i + 1}/3: Preparing for bottom...`;
               img = await downloadToDataUri(r);
             } else {
               return r;
@@ -474,13 +467,10 @@ async function runPipeline(jobId: string, photoBase64: string, mediaType: string
           }
         }
 
-        // Step 2: Apply bottom garment on the result
         if (bottomMatch?.url) {
-          job.step = `Look ${i + 1}/3: ${bottomFashnPrompt}...`;
           const r = await fashnProductToModel(img, bottomMatch.url, bottomFashnPrompt);
           if (r) return r;
         }
-
         return null;
       };
 
@@ -494,13 +484,7 @@ async function runPipeline(jobId: string, photoBase64: string, mediaType: string
         analyzeOutfit(photoBase64, mt, outfit, profile, pickedProducts),
       ]);
 
-      const formatProduct = (p: NamshiProduct) => ({
-        brand: p.brand, title: p.title, price: p.price,
-        originalPrice: p.originalPrice, productUrl: p.productUrl,
-        imageUrl: p.imageUrl, sizes: p.sizes, sku: p.sku,
-      });
-
-      job.outfits.push({
+      const result: OutfitResult = {
         outfit: { name: outfit.name, items: outfit.items, totalPrice: outfit.totalPrice },
         analysis,
         tryOnImage,
@@ -512,15 +496,22 @@ async function runPipeline(jobId: string, photoBase64: string, mediaType: string
           top: topMatch?.searchResult || null,
           bottom: bottomMatch?.searchResult || null,
         },
-      });
+      };
 
-      // Clear live search results now that this outfit is done
-      job.liveSearchResults = undefined;
-      console.log(`[Job ${jobId}] Outfit ${i + 1}/3 "${outfit.name}" done`);
-    }
+      // Push to job as soon as done so frontend can show it immediately
+      job.outfits.push(result);
+      console.log(`[Job ${jobId}] Look ${i + 1}/3 "${outfit.name}" done`);
+      return result;
+    };
+
+    // Launch all 3 in parallel
+    await Promise.all(
+      outfits.slice(0, 3).map((outfit: { name: string; items: { name: string; brand: string; category: string; price: number; currency: string; searchQuery?: string; fashnPrompt?: string }[]; totalPrice: number }, i: number) => processOutfit(outfit, i))
+    );
 
     job.step = "Complete!";
     job.status = "completed";
+    job.liveSearchResults = undefined;
     console.log(`[Job ${jobId}] All 3 outfits completed`);
   } catch (error) {
     console.error(`[Job ${jobId}] Failed:`, error);
