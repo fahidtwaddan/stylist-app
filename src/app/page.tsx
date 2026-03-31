@@ -13,6 +13,7 @@ const UPLOAD_RULES = [
   "Plain background preferred",
   "No group photos — solo only",
   "Must be appropriately dressed",
+  "Accepted formats: JPG, PNG, HEIC, WebP",
 ];
 
 export default function LandingPage() {
@@ -38,7 +39,8 @@ function LandingContent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (file: File) => {
-    if (!file.type.startsWith("image/")) return;
+    const isHeic = file.type === "image/heic" || file.type === "image/heif" || /\.heic$/i.test(file.name) || /\.heif$/i.test(file.name);
+    if (!file.type.startsWith("image/") && !isHeic) return;
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
@@ -59,7 +61,7 @@ function LandingContent() {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -105,6 +107,13 @@ function LandingContent() {
             <p className="text-lg font-semibold text-white">Upload Your Photo</p>
             <p className="mt-1 text-sm text-white/50">AI detects your body type automatically</p>
           </motion.button>
+
+          {/* OR divider */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-white/10" />
+            <span className="text-xs font-medium text-white/30 uppercase tracking-wider">or</span>
+            <div className="flex-1 h-px bg-white/10" />
+          </div>
 
           {/* Option 2: Select Body Type */}
           <motion.button
@@ -203,74 +212,103 @@ function LandingContent() {
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md rounded-t-3xl bg-[#1a1a2e] border-t border-white/10 px-6 pt-6 pb-8"
+              className="w-full max-w-md max-h-[75vh] rounded-t-3xl bg-[#1a1a2e] border-t border-white/10 flex flex-col"
             >
               {/* Handle bar */}
-              <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
+              <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mt-4 mb-3 flex-shrink-0" />
 
-              <h2 className="text-lg font-bold text-white mb-1">
-                Photo Guidelines
-              </h2>
-              <p className="text-sm text-white/40 mb-5">
-                For the best AI analysis, please ensure:
-              </p>
+              {/* Scrollable content */}
+              <div className="overflow-y-auto flex-1 px-6 pb-2">
+                <h2 className="text-lg font-bold text-white mb-1">
+                  Photo Guidelines
+                </h2>
+                <p className="text-sm text-white/40 mb-5">
+                  For the best AI analysis, please ensure:
+                </p>
 
-              <div className="space-y-3 mb-6">
-                {UPLOAD_RULES.map((rule, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <div className="h-5 w-5 rounded-full bg-gold-400/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-[10px] font-bold text-gold-400">{i + 1}</span>
+                <div className="space-y-3 mb-5">
+                  {UPLOAD_RULES.map((rule, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className="h-5 w-5 rounded-full bg-gold-400/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-[10px] font-bold text-gold-400">{i + 1}</span>
+                      </div>
+                      <p className="text-sm text-white/70">{rule}</p>
                     </div>
-                    <p className="text-sm text-white/70">{rule}</p>
+                  ))}
+                </div>
+
+                {/* Photo Examples */}
+                <div className="mb-5">
+                  <p className="text-xs text-white/40 mb-3 uppercase tracking-wider">Photo examples</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Good example */}
+                    <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-green-400 text-sm">&#10003;</span>
+                        <span className="text-[11px] text-green-400/80 font-medium">Good</span>
+                      </div>
+                      <p className="text-[10px] text-white/40 mt-0.5">Full body, straight pose, plain background</p>
+                    </div>
+                    {/* Bad example */}
+                    <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-red-400 text-sm">&#10007;</span>
+                        <span className="text-[11px] text-red-400/80 font-medium">Bad</span>
+                      </div>
+                      <p className="text-[10px] text-white/40 mt-0.5">Cropped, group photo, blurry or dark</p>
+                    </div>
                   </div>
-                ))}
+                </div>
+
+                {/* Height & Weight */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <label className="text-xs text-white/40 mb-1 block">Height (cm) <span className="text-red-400">*</span></label>
+                    <input
+                      type="number"
+                      placeholder="170"
+                      value={height}
+                      onChange={(e) => setHeight(e.target.value)}
+                      className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2.5 text-sm text-white placeholder-white/20 focus:border-gold-400/50 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-white/40 mb-1 block">Weight (kg) <span className="text-red-400">*</span></label>
+                    <input
+                      type="number"
+                      placeholder="70"
+                      value={weight}
+                      onChange={(e) => setWeight(e.target.value)}
+                      className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2.5 text-sm text-white placeholder-white/20 focus:border-gold-400/50 focus:outline-none"
+                    />
+                  </div>
+                </div>
               </div>
 
-              {/* Height & Weight */}
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <div>
-                  <label className="text-xs text-white/40 mb-1 block">Height (cm) <span className="text-red-400">*</span></label>
-                  <input
-                    type="number"
-                    placeholder="170"
-                    value={height}
-                    onChange={(e) => setHeight(e.target.value)}
-                    className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2.5 text-sm text-white placeholder-white/20 focus:border-gold-400/50 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-white/40 mb-1 block">Weight (kg) <span className="text-red-400">*</span></label>
-                  <input
-                    type="number"
-                    placeholder="70"
-                    value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
-                    className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2.5 text-sm text-white placeholder-white/20 focus:border-gold-400/50 focus:outline-none"
-                  />
-                </div>
+              {/* Fixed buttons at bottom */}
+              <div className="px-6 pb-8 pt-3 flex-shrink-0 border-t border-white/5">
+                <button
+                  onClick={() => {
+                    setShowGuardrails(false);
+                    fileInputRef.current?.click();
+                  }}
+                  disabled={!height || !weight}
+                  className={`w-full rounded-2xl py-4 text-base font-bold transition-transform ${
+                    height && weight
+                      ? "bg-gradient-to-r from-gold-400 to-gold-500 text-black shadow-lg shadow-gold-400/20 active:scale-[0.98]"
+                      : "bg-white/10 text-white/30 cursor-not-allowed"
+                  }`}
+                >
+                  Continue & Upload Photo
+                </button>
+
+                <button
+                  onClick={() => setShowGuardrails(false)}
+                  className="w-full mt-3 rounded-2xl border border-white/10 py-3 text-sm text-white/50 hover:text-white/70 transition-colors"
+                >
+                  Cancel
+                </button>
               </div>
-
-              <button
-                onClick={() => {
-                  setShowGuardrails(false);
-                  fileInputRef.current?.click();
-                }}
-                disabled={!height || !weight}
-                className={`w-full rounded-2xl py-4 text-base font-bold transition-transform ${
-                  height && weight
-                    ? "bg-gradient-to-r from-gold-400 to-gold-500 text-black shadow-lg shadow-gold-400/20 active:scale-[0.98]"
-                    : "bg-white/10 text-white/30 cursor-not-allowed"
-                }`}
-              >
-                Continue & Upload Photo
-              </button>
-
-              <button
-                onClick={() => setShowGuardrails(false)}
-                className="w-full mt-3 rounded-2xl border border-white/10 py-3 text-sm text-white/50 hover:text-white/70 transition-colors"
-              >
-                Cancel
-              </button>
             </motion.div>
           </motion.div>
         )}
@@ -289,8 +327,8 @@ function LandingContent() {
         <div className="flex items-center gap-3">
           {[
             { step: "01", text: "Upload photo / Choose your body type" },
-            { step: "02", text: "Select your occasion" },
-            { step: "03", text: "AI will matching clothes" },
+            { step: "02", text: "Select or Prompt your occasion" },
+            { step: "03", text: "AI will Match clothes" },
           ].map((item, i) => (
             <div key={i} className="flex-1 text-center">
               <span className="text-xs font-mono text-gold-400/60">

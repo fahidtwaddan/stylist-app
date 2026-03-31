@@ -100,7 +100,7 @@ export default function OccasionsPage() {
     <div className="min-h-screen px-5 py-8">
       {/* Back button */}
       <button
-        onClick={() => router.push("/profile")}
+        onClick={() => router.push("/")}
         className="mb-6 text-sm text-white/40 hover:text-white/60 transition-colors"
       >
         &larr; Style Profile

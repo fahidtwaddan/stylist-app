@@ -345,7 +345,6 @@ async function fashnProductToModel(model: string, garment: string, promptText: s
         model_image: model,
         product_image: garment,
         prompt: promptText,
-        mode: "fast",
         resolution: "1k",
         output_format: "png",
       },

@@ -6,9 +6,26 @@ import { motion, AnimatePresence } from "framer-motion";
 import ScanningAnimation from "@/components/ScanningAnimation";
 import { useStyleStore } from "@/store/useStyleStore";
 
+// Check if a file is HEIC/HEIF format
+function isHeicFile(file: File): boolean {
+  return file.type === "image/heic" || file.type === "image/heif"
+    || /\.heic$/i.test(file.name) || /\.heif$/i.test(file.name);
+}
+
+// Convert HEIC to JPEG using heic2any, then resize
+async function convertHeicToJpeg(file: File): Promise<File> {
+  const heic2any = (await import("heic2any")).default;
+  const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
+  const result = Array.isArray(blob) ? blob[0] : blob;
+  const safeName = file.name.replace(/\.[^/.]+$/, "") || "upload";
+  return new File([result], `${safeName}.jpg`, { type: "image/jpeg" });
+}
+
 // Convert image to JPEG client-side and resize if needed.
-// This prevents unsupported formats (e.g. HEIC) from failing at the API layer.
 async function resizeImage(file: File, maxDim: number): Promise<File> {
+  // Convert HEIC first since browsers can't decode it natively
+  const inputFile = isHeicFile(file) ? await convertHeicToJpeg(file) : file;
+
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -23,10 +40,10 @@ async function resizeImage(file: File, maxDim: number): Promise<File> {
       canvas.toBlob(
         (blob) => {
           if (blob) {
-            const safeName = file.name.replace(/\.[^/.]+$/, "") || "upload";
+            const safeName = inputFile.name.replace(/\.[^/.]+$/, "") || "upload";
             resolve(new File([blob], `${safeName}.jpg`, { type: "image/jpeg" }));
           } else {
-            resolve(file);
+            resolve(inputFile);
           }
         },
         "image/jpeg",
@@ -36,9 +53,9 @@ async function resizeImage(file: File, maxDim: number): Promise<File> {
     };
     img.onerror = () => {
       URL.revokeObjectURL(img.src);
-      resolve(file); // Fallback to original
+      resolve(inputFile);
     };
-    const objectUrl = URL.createObjectURL(file);
+    const objectUrl = URL.createObjectURL(inputFile);
     img.src = objectUrl;
   });
 }
@@ -71,6 +88,9 @@ export default function AnalyzingPage() {
 
   const hasRun = useRef(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [displayPhoto, setDisplayPhoto] = useState<string | null>(
+    photo && !photoFile ? photo : (photoFile && !isHeicFile(photoFile) ? photo : null)
+  );
 
   const runAnalysis = useCallback(async () => {
     if (hasRun.current) return;
@@ -83,8 +103,23 @@ export default function AnalyzingPage() {
     setAnalyzing(true);
     setValidationError(null);
 
+    // Convert HEIC to JPEG first so preview + API both work
+    let workingFile = photoFile;
+    if (isHeicFile(photoFile)) {
+      try {
+        setAnalysisProgress(5, "Converting image format...");
+        const jpegFile = await convertHeicToJpeg(photoFile);
+        const url = URL.createObjectURL(jpegFile);
+        setDisplayPhoto(url);
+        setPhoto(url, jpegFile);
+        workingFile = jpegFile;
+      } catch {
+        // Fall through — resizeImage will also try conversion
+      }
+    }
+
     // Simulate progress while API call runs
-    let progress = 0;
+    let progress = 10;
     const interval = setInterval(() => {
       if (progress < 90) {
         progress += Math.random() * 8 + 2;
@@ -99,7 +134,7 @@ export default function AnalyzingPage() {
 
     try {
       // Resize image before upload to speed up Vision API
-      const resizedFile = await resizeImage(photoFile, 1024);
+      const resizedFile = await resizeImage(workingFile, 1024);
 
       // Save base64 of the normalized image for later try-on API
       const reader = new FileReader();
@@ -143,7 +178,7 @@ export default function AnalyzingPage() {
 
       setTimeout(() => {
         setAnalyzing(false);
-        router.push("/profile");
+        router.push("/occasions");
       }, 800);
     } catch (error) {
       clearInterval(interval);
@@ -210,7 +245,7 @@ export default function AnalyzingPage() {
         className="w-full max-w-sm"
       >
         <ScanningAnimation
-          photoUrl={photo}
+          photoUrl={displayPhoto || photo}
           progress={analysisProgress}
           stage={analysisStage}
         />

@@ -14,6 +14,7 @@
     "cheerio": "^1.2.0",
     "fashn": "^0.13.0",
     "framer-motion": "^12.36.0",
+    "heic2any": "^0.0.4",
     "lucide-react": "^1.7.0",
     "next": "14.2.35",
     "react": "^18",

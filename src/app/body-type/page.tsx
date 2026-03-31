@@ -6,20 +6,20 @@ import { motion } from "framer-motion";
 import { useStyleStore } from "@/store/useStyleStore";
 
 const MEN_BODY_TYPES = [
-  { id: "rectangle", label: "Rectangle", desc: "Balanced, straight build", image: "/body-shapes/men/Rectangle.png" },
-  { id: "triangle", label: "Triangle", desc: "Wider hips, narrower shoulders", image: "/body-shapes/men/Triangle.png" },
-  { id: "trapezoid", label: "Trapezoid", desc: "Broad shoulders, narrow waist", image: "/body-shapes/men/Trapezoid.png" },
-  { id: "oval", label: "Oval", desc: "Fuller midsection", image: "/body-shapes/men/Oval.png" },
-  { id: "inverted-triangle", label: "Inverted Triangle", desc: "Wide shoulders, slim hips", image: "/body-shapes/men/Inverted%20Triangle.png" },
+  { id: "rectangle", label: "Rectangle", desc: "Balanced, straight build", image: "/body-shapes/men/Rectangle.png", ref: "/body-shapes-references/men/rectangle.png" },
+  { id: "triangle", label: "Triangle", desc: "Wider hips, narrower shoulders", image: "/body-shapes/men/Triangle.png", ref: "/body-shapes-references/men/triangle.png" },
+  { id: "trapezoid", label: "Trapezoid", desc: "Broad shoulders, narrow waist", image: "/body-shapes/men/Trapezoid.png", ref: "/body-shapes-references/men/trapezoid.png" },
+  { id: "oval", label: "Oval", desc: "Fuller midsection", image: "/body-shapes/men/Oval.png", ref: "/body-shapes-references/men/oval.png" },
+  { id: "inverted-triangle", label: "Inverted Triangle", desc: "Wide shoulders, slim hips", image: "/body-shapes/men/Inverted%20Triangle.png", ref: "/body-shapes-references/men/invert.png" },
 ];
 
 const WOMEN_BODY_TYPES = [
-  { id: "rectangle", label: "Rectangle", desc: "Balanced proportions", image: "/body-shapes/women/Rectangle.png" },
-  { id: "pear", label: "Pear / Triangle", desc: "Wider hips than shoulders", image: "/body-shapes/women/Pear%20Triangle.png" },
-  { id: "hourglass", label: "Hourglass", desc: "Balanced bust & hips, narrow waist", image: "/body-shapes/women/Hourglass.png" },
-  { id: "inverted-triangle", label: "Inverted Triangle", desc: "Broader shoulders", image: "/body-shapes/women/Inverted%20Triangle.png" },
-  { id: "diamond", label: "Diamond", desc: "Fuller midsection", image: "/body-shapes/women/Diamond.png" },
-  { id: "round-apple", label: "Round / Apple", desc: "Fuller torso, slim legs", image: "/body-shapes/women/Round%20Apple.png" },
+  { id: "rectangle", label: "Rectangle", desc: "Balanced proportions", image: "/body-shapes/women/Rectangle.png", ref: "/body-shapes-references/women/rectangle.png" },
+  { id: "pear", label: "Pear / Triangle", desc: "Wider hips than shoulders", image: "/body-shapes/women/Pear%20Triangle.png", ref: "/body-shapes-references/women/pear.png" },
+  { id: "hourglass", label: "Hourglass", desc: "Balanced bust & hips, narrow waist", image: "/body-shapes/women/Hourglass.png", ref: "/body-shapes-references/women/hourglass.png" },
+  { id: "inverted-triangle", label: "Inverted Triangle", desc: "Broader shoulders", image: "/body-shapes/women/Inverted%20Triangle.png", ref: "/body-shapes-references/women/inverted.png" },
+  { id: "diamond", label: "Diamond", desc: "Fuller midsection", image: "/body-shapes/women/Diamond.png", ref: "/body-shapes-references/women/diamond.png" },
+  { id: "round-apple", label: "Round / Apple", desc: "Fuller torso, slim legs", image: "/body-shapes/women/Round%20Apple.png", ref: "/body-shapes-references/women/round.png" },
 ];
 
 export default function BodyTypePage() {
@@ -33,7 +33,6 @@ export default function BodyTypePage() {
   if (!gender) return null;
 
   const bodyTypes = gender === "men" ? MEN_BODY_TYPES : WOMEN_BODY_TYPES;
-  const imgSrc = gender === "men" ? "/men.png" : "/women.png";
 
   const handleSelect = (bodyType: string) => {
     const selected = bodyTypes.find((bt) => bt.id === bodyType);
@@ -50,7 +49,7 @@ export default function BodyTypePage() {
       avoidColors: [],
       recommendations: [],
     });
-    router.push("/profile");
+    router.push("/occasions");
   };
 
   return (
@@ -104,20 +103,6 @@ export default function BodyTypePage() {
         </div>
       </motion.div>
 
-      {/* Reference Image */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="mb-6 rounded-2xl overflow-hidden border border-white/10"
-      >
-        <img
-          src={imgSrc}
-          alt={`${gender} body types reference`}
-          className="w-full object-contain"
-        />
-      </motion.div>
-
       {/* Required notice */}
       {(!height || !weight) && (
         <motion.p
@@ -139,8 +124,15 @@ export default function BodyTypePage() {
             transition={{ delay: 0.15 + i * 0.05 }}
             whileTap={{ scale: 0.97 }}
             onClick={() => handleSelect(bt.id)}
-            className="glass rounded-2xl p-4 text-left hover:border-gold-400/50 border border-transparent transition-all"
+            className="glass rounded-2xl p-3 text-center hover:border-gold-400/50 border border-transparent transition-all flex flex-col items-center"
           >
+            <div className="w-full h-44 mb-2 rounded-xl overflow-hidden bg-white/5">
+              <img
+                src={bt.ref}
+                alt={bt.label}
+                className="w-full h-full object-contain object-center"
+              />
+            </div>
             <p className="text-sm font-semibold text-white">{bt.label}</p>
             <p className="text-xs text-white/40 mt-1">{bt.desc}</p>
           </motion.button>

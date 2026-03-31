@@ -220,7 +220,6 @@ async function fashnProductToModel(
         model_image: modelImage,
         product_image: garmentUrl,
         prompt: promptText,
-        mode: "fast",
         resolution: "1k",
         output_format: "png",
       },
