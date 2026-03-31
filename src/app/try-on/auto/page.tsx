@@ -80,7 +80,8 @@ export default function AutoTryOnPage() {
   const runFullPipeline = useCallback(async () => {
     if (hasRun.current) return;
     if (!profile || !selectedOccasion) return;
-    if (outfits.length > 0) return;
+    // Skip if we already have cached results from a previous run
+    if (useStyleStore.getState().autoTryOnResult?.outfits?.length) return;
     hasRun.current = true;
 
     let b64 = photoBase64;
