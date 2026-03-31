@@ -386,9 +386,9 @@ export async function POST(request: NextRequest) {
     console.log("[Try-On] Top:", topMatch?.product?.brand || topMatch?.url?.substring(0, 50) || "none");
     console.log("[Try-On] Bottom:", bottomMatch?.product?.brand || bottomMatch?.url?.substring(0, 50) || "none");
 
-    // Get fashn prompts from outfit items
-    const topFashnPrompt = topItem?.fashnPrompt || `apply this ${topItem?.name || "top"}`;
-    const bottomFashnPrompt = bottomItem?.fashnPrompt || `apply this ${bottomItem?.name || "bottom"}`;
+    // Build product names for FASHN prompts
+    const topProductName = topMatch?.product ? `${topMatch.product.brand} ${topMatch.product.title}` : (topItem?.name || "top");
+    const bottomProductName = bottomMatch?.product ? `${bottomMatch.product.brand} ${bottomMatch.product.title}` : (bottomItem?.name || "bottom");
 
     // ── Step 2: FASHN product-to-model (chained) + Claude analysis in parallel ──
     const pickedProducts = [
@@ -405,7 +405,10 @@ export async function POST(request: NextRequest) {
       // Step 1: Apply top garment
       if (topMatch?.url) {
         console.log("[FASHN] Applying top via product-to-model...");
-        const topResult = await fashnProductToModel(currentImage, topMatch.url, topFashnPrompt);
+        const topResult = await fashnProductToModel(
+          currentImage, topMatch.url,
+          `Dress the model wearing exactly this product: ${topProductName}. Use the exact garment from the product image, do not change its design, color, or pattern.`
+        );
         if (topResult) {
           if (bottomMatch?.url) {
             currentImage = await imageUrlToDataUri(topResult);
@@ -418,7 +421,10 @@ export async function POST(request: NextRequest) {
       // Step 2: Apply bottom garment on the result
       if (bottomMatch?.url) {
         console.log("[FASHN] Applying bottom via product-to-model...");
-        const bottomResult = await fashnProductToModel(currentImage, bottomMatch.url, bottomFashnPrompt);
+        const bottomResult = await fashnProductToModel(
+          currentImage, bottomMatch.url,
+          `Dress the model wearing exactly this product as bottom: ${bottomProductName}. Use the exact garment from the product image. Keep the existing top garment unchanged.`
+        );
         if (bottomResult) return bottomResult;
       }
 
